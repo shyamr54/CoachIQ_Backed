@@ -21,7 +21,45 @@ const listBatchesQuerySchema = z.object({
     })
 });
 
+const createBatchSchema = z.object({
+  name: z.string().trim().min(1),
+  subject: z.string().trim().min(1),
+  teacherId: z.string().trim().min(1),
+  isActive: z.boolean().default(true)
+});
+
 export const batchesRouter = Router();
+
+batchesRouter.post(
+  "/",
+  requireAuth,
+  requireRoles(UserRole.ADMIN),
+  validate({ body: createBatchSchema }),
+  asyncHandler(async (req, res) => {
+    const payload = req.body as z.infer<typeof createBatchSchema>;
+
+    const teacher = await prisma.user.findFirst({
+      where: {
+        id: payload.teacherId,
+        coachingId: req.auth!.coachingId,
+        role: UserRole.TEACHER
+      }
+    });
+
+    if (!teacher) {
+      throw new AppError(404, "Teacher not found", "TEACHER_NOT_FOUND");
+    }
+
+    const batch = await prisma.batch.create({
+      data: {
+        ...payload,
+        coachingId: req.auth!.coachingId
+      }
+    });
+
+    return sendSuccess(res, batch, 201);
+  })
+);
 
 batchesRouter.get(
   "/",
@@ -64,6 +102,39 @@ batchesRouter.get(
     });
 
     return sendSuccess(res, batches);
+  })
+);
+
+batchesRouter.get(
+  "/:id",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const batch = await prisma.batch.findFirst({
+      where: {
+        id: req.params.id,
+        coachingId: req.auth!.coachingId
+      },
+      include: {
+        teacher: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        _count: {
+          select: {
+            students: true,
+            tests: true
+          }
+        }
+      }
+    });
+
+    if (!batch) {
+      throw new AppError(404, "Batch not found", "BATCH_NOT_FOUND");
+    }
+
+    return sendSuccess(res, batch);
   })
 );
 

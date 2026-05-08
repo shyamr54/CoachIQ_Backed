@@ -27,56 +27,15 @@ const bulkStudentsSchema = z
   )
   .min(1, "At least one student is required");
 
+const singleStudentSchema = z.object({
+  name: z.string().trim().min(1),
+  parentPhone: phoneSchema,
+  batchId: idSchema.optional(),
+  parentName: z.string().trim().optional(),
+  rollNumber: z.string().trim().optional()
+});
+
 export const studentsRouter = Router();
-
-studentsRouter.get(
-  "/",
-  requireAuth,
-  validate({ query: listStudentsQuerySchema }),
-  asyncHandler(async (req, res) => {
-    const query = req.query as z.infer<typeof listStudentsQuerySchema>;
-    const where: Prisma.StudentWhereInput = {
-      coachingId: req.auth!.coachingId
-    };
-
-    if (query.batchId) {
-      where.batchId = query.batchId;
-    }
-
-    if (query.search) {
-      where.OR = [
-        { name: { contains: query.search } },
-        { parentName: { contains: query.search } },
-        { parentPhone: { contains: query.search } },
-        { rollNumber: { contains: query.search } }
-      ];
-    }
-
-    if (req.auth!.role === UserRole.TEACHER) {
-      where.batch = {
-        teacherId: req.auth!.userId
-      };
-    }
-
-    const students = await prisma.student.findMany({
-      where,
-      orderBy: {
-        createdAt: "asc"
-      },
-      include: {
-        batch: {
-          select: {
-            id: true,
-            name: true,
-            subject: true
-          }
-        }
-      }
-    });
-
-    return sendSuccess(res, students);
-  })
-);
 
 studentsRouter.post(
   "/bulk",
@@ -134,6 +93,159 @@ studentsRouter.post(
     );
 
     return sendSuccess(res, createdStudents, 201);
+  })
+);
+
+studentsRouter.post(
+  "/",
+  requireAuth,
+  requireRoles(UserRole.ADMIN),
+  validate({ body: singleStudentSchema }),
+  asyncHandler(async (req, res) => {
+    const payload = req.body as z.infer<typeof singleStudentSchema>;
+
+    if (payload.batchId) {
+      const batch = await prisma.batch.findFirst({
+        where: {
+          id: payload.batchId,
+          coachingId: req.auth!.coachingId
+        }
+      });
+
+      if (!batch) {
+        throw new AppError(404, "Batch not found", "BATCH_NOT_FOUND");
+      }
+    }
+
+    const student = await prisma.student.create({
+      data: {
+        ...payload,
+        coachingId: req.auth!.coachingId
+      }
+    });
+
+    return sendSuccess(res, student, 201);
+  })
+);
+
+studentsRouter.get(
+  "/:id",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const student = await prisma.student.findFirst({
+      where: {
+        id: req.params.id,
+        coachingId: req.auth!.coachingId
+      },
+      include: {
+        batch: true
+      }
+    });
+
+    if (!student) {
+      throw new AppError(404, "Student not found", "STUDENT_NOT_FOUND");
+    }
+
+    return sendSuccess(res, student);
+  })
+);
+
+studentsRouter.get(
+  "/",
+  requireAuth,
+  validate({ query: listStudentsQuerySchema }),
+  asyncHandler(async (req, res) => {
+    const query = req.query as z.infer<typeof listStudentsQuerySchema>;
+    const where: Prisma.StudentWhereInput = {
+      coachingId: req.auth!.coachingId
+    };
+
+    if (query.batchId) {
+      where.batchId = query.batchId;
+    }
+
+    if (query.search) {
+      where.OR = [
+        { name: { contains: query.search } },
+        { parentName: { contains: query.search } },
+        { parentPhone: { contains: query.search } },
+        { rollNumber: { contains: query.search } }
+      ];
+    }
+
+    if (req.auth!.role === UserRole.TEACHER) {
+      where.batch = {
+        teacherId: req.auth!.userId
+      };
+    }
+
+    const students = await prisma.student.findMany({
+      where,
+      orderBy: {
+        createdAt: "asc"
+      },
+      include: {
+        batch: {
+          select: {
+            id: true,
+            name: true,
+            subject: true
+          }
+        }
+      }
+    });
+
+    return sendSuccess(res, students);
+  })
+);
+
+studentsRouter.patch(
+  "/:id",
+  requireAuth,
+  requireRoles(UserRole.ADMIN),
+  asyncHandler(async (req, res) => {
+    const student = await prisma.student.findFirst({
+      where: {
+        id: req.params.id,
+        coachingId: req.auth!.coachingId
+      }
+    });
+
+    if (!student) {
+      throw new AppError(404, "Student not found", "STUDENT_NOT_FOUND");
+    }
+
+    const updated = await prisma.student.update({
+      where: { id: req.params.id },
+      data: req.body
+    });
+
+    return sendSuccess(res, updated);
+  })
+);
+
+studentsRouter.delete(
+  "/:id",
+  requireAuth,
+  requireRoles(UserRole.ADMIN),
+  asyncHandler(async (req, res) => {
+    const student = await prisma.student.findFirst({
+      where: {
+        id: req.params.id,
+        coachingId: req.auth!.coachingId
+      }
+    });
+
+    if (!student) {
+      throw new AppError(404, "Student not found", "STUDENT_NOT_FOUND");
+    }
+
+    await prisma.student.update({
+      where: { id: req.params.id },
+      data: { isActive: false }
+    });
+
+    return sendSuccess(res, { message: "Student deactivated successfully" });
   })
 );
 

@@ -165,3 +165,54 @@ testsRouter.post(
   })
 );
 
+testsRouter.get(
+  "/",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { batchId } = req.query;
+    const where: any = { coachingId: req.auth!.coachingId };
+    
+    if (batchId) {
+      where.batchId = batchId as string;
+    }
+
+    if (req.auth!.role === UserRole.TEACHER) {
+      where.batch = { teacherId: req.auth!.userId };
+    }
+
+    const tests = await prisma.test.findMany({
+      where,
+      orderBy: { testDate: "desc" },
+      include: {
+        batch: {
+          select: { name: true, subject: true }
+        }
+      }
+    });
+
+    return sendSuccess(res, tests);
+  })
+);
+
+testsRouter.get(
+  "/:testId",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const test = await prisma.test.findFirst({
+      where: {
+        id: req.params.testId,
+        coachingId: req.auth!.coachingId
+      },
+      include: {
+        batch: true
+      }
+    });
+
+    if (!test) {
+      throw new AppError(404, "Test not found", "TEST_NOT_FOUND");
+    }
+
+    return sendSuccess(res, test);
+  })
+);
+
