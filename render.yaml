@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: coachiq-backend
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: DATABASE_URL
+        value: file:/app/data/dev.db
+      - key: UPLOADS_DIR
+        value: /app/data/uploads
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: CORS_ORIGIN
+        sync: false
+      - key: OTP_TTL_SECONDS
+        value: "300"
+      - key: EXPOSE_DEBUG_OTP
+        value: "false"
+      - key: BOOTSTRAP_DEMO_DATA
+        value: "false"
+    disk:
+      name: coachiq-data
+      mountPath: /app/data
+      sizeGB: 1
+

@@ -1,0 +1,640 @@
+{
+  "info": {
+    "_postman_id": "26a1f75d-bcb7-48e3-85b3-4af64a7f06d3",
+    "name": "CoachIQ Backend",
+    "description": "End-to-end collection for the current CoachIQ backend contract. It authenticates with the seeded admin user, exercises the main read and write APIs, and stores IDs between requests.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const now = new Date();",
+          "const yyyy = now.getUTCFullYear();",
+          "const mm = String(now.getUTCMonth() + 1).padStart(2, '0');",
+          "const dd = String(now.getUTCDate()).padStart(2, '0');",
+          "pm.environment.set('todayDate', `${yyyy}-${mm}-${dd}`);",
+          "pm.environment.set('reportMonth', String(now.getUTCMonth() + 1));",
+          "pm.environment.set('reportYear', String(now.getUTCFullYear()));"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const json = pm.response.json();",
+              "pm.test('Health payload is successful', function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json.data.status).to.eql('ok');",
+              "});",
+              "['adminOtp', 'authToken', 'batchId', 'studentId', 'importedStudentId', 'testId'].forEach((key) => pm.environment.unset(key));",
+              "const epoch = String(Date.now());",
+              "pm.environment.set('runId', epoch.slice(-8));",
+              "pm.environment.set('importParentPhone', `9${epoch.slice(-9)}`);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Request Admin OTP",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const json = pm.response.json();",
+              "pm.test('OTP request succeeded', function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json.data.phone).to.eql(pm.environment.get('adminPhone'));",
+              "});",
+              "pm.test('Debug OTP is exposed for automated local testing', function () {",
+              "  pm.expect(json.data.debugOtp, 'Set EXPOSE_DEBUG_OTP=true for automated Postman runs').to.be.a('string');",
+              "});",
+              "pm.environment.set('adminOtp', json.data.debugOtp);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"{{adminPhone}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/request-otp",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "auth",
+            "request-otp"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Verify Admin OTP",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const json = pm.response.json();",
+              "pm.test('OTP verification succeeded', function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json.data.token).to.be.a('string');",
+              "  pm.expect(json.data.user.role).to.eql('ADMIN');",
+              "});",
+              "pm.environment.set('authToken', json.data.token);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"{{adminPhone}}\",\n  \"otp\": \"{{adminOtp}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/verify-otp",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "auth",
+            "verify-otp"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get My Coaching Profile",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const json = pm.response.json();",
+              "pm.test('Coaching profile is returned', function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json.data.name).to.be.a('string');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/coaching/me",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "coaching",
+            "me"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "List Staff",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const json = pm.response.json();",
+              "pm.test('Staff list is returned', function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json.data.length).to.be.at.least(3);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/users",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "users"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "List Active Batches",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const json = pm.response.json();",
+              "pm.test('At least one batch is returned', function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json.data.length, 'Seed data should provide at least one batch').to.be.above(0);",
+              "});",
+              "pm.environment.set('batchId', json.data[0].id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/batches?isActive=true",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "batches"
+          ],
+          "query": [
+            {
+              "key": "isActive",
+              "value": "true"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "List Students In Batch",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const json = pm.response.json();",
+              "pm.test('At least one student is returned', function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json.data.length, 'Seed data should provide at least one student').to.be.above(0);",
+              "});",
+              "pm.environment.set('studentId', json.data[0].id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/students?batchId={{batchId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "students"
+          ],
+          "query": [
+            {
+              "key": "batchId",
+              "value": "{{batchId}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Bulk Student Import",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201', function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "const json = pm.response.json();",
+              "pm.test('Bulk import created one student', function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json.data.length).to.eql(1);",
+              "});",
+              "pm.environment.set('importedStudentId', json.data[0].id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "[\n  {\n    \"name\": \"Postman Student {{runId}}\",\n    \"parentName\": \"Postman Parent\",\n    \"parentPhone\": \"{{importParentPhone}}\",\n    \"batchId\": \"{{batchId}}\",\n    \"rollNumber\": \"PM-{{runId}}\"\n  }\n]"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/students/bulk",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "students",
+            "bulk"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Create Test",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201', function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "const json = pm.response.json();",
+              "pm.test('Test was created', function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json.data.id).to.be.a('string');",
+              "});",
+              "pm.environment.set('testId', json.data.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"batchId\": \"{{batchId}}\",\n  \"subject\": \"Mathematics\",\n  \"testDate\": \"{{todayDate}}\",\n  \"maxMarks\": 100\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/tests",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "tests"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Bulk Mark Entry",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const json = pm.response.json();",
+              "pm.test('Marks were saved', function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json.data.length).to.eql(1);",
+              "  pm.expect(json.data[0].studentId).to.eql(pm.environment.get('studentId'));",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "[\n  {\n    \"studentId\": \"{{studentId}}\",\n    \"marksObtained\": 85,\n    \"remarks\": \"Postman automated check\"\n  }\n]"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/tests/{{testId}}/marks",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "tests",
+            "{{testId}}",
+            "marks"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Attendance In",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201', function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "const json = pm.response.json();",
+              "pm.test('Attendance IN was logged', function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json.data.type).to.eql('IN');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"studentId\": \"{{studentId}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/attendance/in",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "attendance",
+            "in"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Attendance Out",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201', function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "const json = pm.response.json();",
+              "pm.test('Attendance OUT was logged', function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json.data.type).to.eql('OUT');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"studentId\": \"{{studentId}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/attendance/out",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "attendance",
+            "out"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Student Monthly Snapshot",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const json = pm.response.json();",
+              "pm.test('Report is returned with marks history', function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json.data.studentName).to.be.a('string');",
+              "  pm.expect(json.data.marksHistory.length).to.be.at.least(1);",
+              "  pm.expect(['complete', 'partial', 'no-records']).to.include(json.data.attendanceStatus);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/reports/student/{{studentId}}?month={{reportMonth}}&year={{reportYear}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "reports",
+            "student",
+            "{{studentId}}"
+          ],
+          "query": [
+            {
+              "key": "month",
+              "value": "{{reportMonth}}"
+            },
+            {
+              "key": "year",
+              "value": "{{reportYear}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}
+

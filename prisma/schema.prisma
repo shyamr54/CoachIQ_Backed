@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  TEACHER
+  GATE
+}
+
+enum AttendanceType {
+  IN
+  OUT
+}
+
+model Coaching {
+  id         String          @id @default(uuid())
+  name       String
+  ownerName  String
+  phone      String          @unique
+  email      String?
+  address    String?
+  logoUrl    String?
+  timezone   String          @default("Asia/Kolkata")
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  users      User[]
+  students   Student[]
+  batches    Batch[]
+  tests      Test[]
+  marks      Mark[]
+  attendance AttendanceLog[]
+}
+
+model User {
+  id              String    @id @default(uuid())
+  coachingId      String
+  coaching        Coaching  @relation(fields: [coachingId], references: [id], onDelete: Cascade)
+  name            String
+  phone           String    @unique
+  role            UserRole  @default(TEACHER)
+  isActive        Boolean   @default(true)
+  fcmToken        String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  teachingBatches Batch[]
+
+  @@index([coachingId, role])
+}
+
+model Student {
+  id              String          @id @default(uuid())
+  coachingId      String
+  coaching        Coaching        @relation(fields: [coachingId], references: [id], onDelete: Cascade)
+  name            String
+  parentName      String          @default("")
+  parentPhone     String
+  parentFcmToken  String?
+  rollNumber      String?
+  photoUrl        String?
+  isActive        Boolean         @default(true)
+  batchId         String?
+  batch           Batch?          @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  marks           Mark[]
+  attendance      AttendanceLog[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([coachingId, batchId])
+  @@index([coachingId, parentPhone])
+}
+
+model Batch {
+  id          String    @id @default(uuid())
+  coachingId  String
+  coaching    Coaching  @relation(fields: [coachingId], references: [id], onDelete: Cascade)
+  name        String
+  subject     String?
+  isActive    Boolean   @default(true)
+  teacherId   String
+  teacher     User      @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  students    Student[]
+  tests       Test[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([coachingId, isActive])
+  @@index([coachingId, teacherId])
+}
+
+model Test {
+  id         String    @id @default(uuid())
+  coachingId String
+  coaching   Coaching  @relation(fields: [coachingId], references: [id], onDelete: Cascade)
+  batchId    String
+  batch      Batch     @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  subject    String
+  testDate   DateTime
+  maxMarks   Int
+  marks      Mark[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([coachingId, batchId])
+  @@index([coachingId, testDate])
+}
+
+model Mark {
+  id             String    @id @default(uuid())
+  coachingId     String
+  coaching       Coaching  @relation(fields: [coachingId], references: [id], onDelete: Cascade)
+  testId         String
+  test           Test      @relation(fields: [testId], references: [id], onDelete: Cascade)
+  studentId      String
+  student        Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  marksObtained  Float
+  remarks        String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([coachingId, testId, studentId])
+  @@index([coachingId, studentId])
+}
+
+model AttendanceLog {
+  id         String          @id @default(uuid())
+  coachingId String
+  coaching   Coaching        @relation(fields: [coachingId], references: [id], onDelete: Cascade)
+  studentId  String
+  student    Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  timestamp  DateTime        @default(now())
+  type       AttendanceType
+  source     String          @default("gate")
+  createdAt  DateTime        @default(now())
+
+  @@index([coachingId, studentId, timestamp])
+}
+
