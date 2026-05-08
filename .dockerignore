@@ -1,0 +1,8 @@
+.env
+dist
+node_modules
+npm-debug.log
+postman
+prisma/dev.db
+prisma/dev.db-journal
+
